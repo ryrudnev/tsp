@@ -14,9 +14,132 @@ namespace tsp
     public class Graph
     {
         /// <summary>
+        /// Визуализация графа
+        /// </summary>
+        public class Painter
+        {
+            /// <summary>
+            /// Рендеринг графа средствами Graphviz, используя dot.exe
+            /// </summary>
+            /// <param name="script"> скрипт на языке dot </param>
+            /// <returns> битовая карта, содержащая изображения графа.
+            /// Если во время отрисовки произошли ошибки, выбрасывается исключение с указанием причины ошибки
+            /// </returns>
+            private static Bitmap RenderingOnGraphviz(string script)
+            {
+                // проверка существования исполняемого файла Graphviz
+                if (!File.Exists(@"..\Graphviz\dot.exe")) throw new Exception("Приложения dot.exe не найдено");
+
+                // запуск процесса
+                Process dot = new Process();
+                try
+                {
+                    // задание параметров процесса
+                    dot.StartInfo.UseShellExecute = false;
+                    dot.StartInfo.FileName = @"..\Graphviz\dot.exe";
+                    dot.StartInfo.Arguments = "-Tpng";
+                    dot.StartInfo.RedirectStandardInput = true;
+                    dot.StartInfo.RedirectStandardOutput = true;
+                    dot.StartInfo.CreateNoWindow = true;
+                    dot.Start();
+
+                    // передача входных данных для Graphviz
+                    dot.StandardInput.Write(script);
+                    dot.StandardInput.Close();
+
+                    // формирование битового изображения из выходных данных Graphviz
+                    Bitmap image = new Bitmap(dot.StandardOutput.BaseStream, true);
+                    dot.StandardOutput.Close();
+
+                    return image;
+                }
+                catch (Exception e)
+                {
+                    throw new Exception("Не возможно отрисовать граф", e);
+                }
+            }
+
+            /// <summary>
+            /// Простая отрисовка указанного графа
+            /// </summary>
+            /// <param name="g"> указанный граф </param>
+            /// <returns> битовая карта </returns>
+            public static Bitmap Drawing(Graph g)
+            {
+                if (g == null) throw new Exception("Невозможно отрисовать граф. Граф пуст (null)");
+
+                // фомирование скрипта на языке dot
+                string script = (g.IsType == Graph.Type.Directed ? "digraph " : "graph ") + "G { nrankdir = LR ";
+
+                // взаимосвязь между вершинами, взависимости от типа графа
+                string link = g.IsType == Graph.Type.Directed ? " -> " : " -- ";
+
+                // задание вершин
+                for (int i = 0; i < g.CountVertex(); i++)
+                    script += (i + 1) + " ";
+
+                // задание ребер графа
+                for (int i = 0; i < g.CountVertex(); i++)
+                    for (int j = 0; j < g.CountVertex(); j++)
+                        if (!Double.IsInfinity(g.Adjacency[i, j]))
+                            script += (i + 1) + link + (j + 1) + " [label=" + g.Adjacency[i, j] + "] ";
+
+                script += "}";
+
+                // передача скрипта и рендеринг в утилите Graphviz
+                return RenderingOnGraphviz(script);
+            }
+
+            /// <summary>
+            /// Отрисовка указанного графа с выделенныи путем
+            /// </summary>
+            /// <param name="g"> указанный граф </param>
+            /// <param name="p"> указанный путь </param>
+            /// <returns> битовая карта </returns>
+            public static Bitmap Drawing(Graph g, Path p)
+            {
+                if (g == null) throw new Exception("Невозможно отрисовать граф. Граф пуст (null)");
+
+                if (p == null) return Drawing(g);
+
+                // проверка на принадлежность контура графу
+                if (g != p.Owner) throw new Exception("Указанный контур не принадлежит данному графу");
+
+                // фомирование скрипта на языке dot
+                string script = (g.IsType == Graph.Type.Directed ? "digraph " : "graph ") + "G { ";
+
+                // взаимосвязь между вершинами, взависимости от типа графа
+                string link = g.IsType == Graph.Type.Directed ? " -> " : " -- ";
+
+                // задание вершин
+                for (int i = 0; i < g.CountVertex(); i++)
+                    script += (i + 1) + " ";
+
+                // задание ребер графа
+                for (int i = 0; i < g.CountVertex(); i++)
+                    for (int j = 0; j < g.CountVertex(); j++)
+                    {
+                        // если  ребро имеет стоимость не равную бесконечности
+                        if (!Double.IsInfinity(g.Adjacency[i, j]))
+                        {
+                            script += (i + 1) + link + (j + 1) + " [label=" + g.Adjacency[i, j];
+
+                            if (p.IsContain(new Edge(g, i, j, g.Adjacency[i, j]))) script += ", color=red fontcolor=red";
+
+                            script += "] ";
+                        }
+                    }
+
+                script += "}";
+
+                return RenderingOnGraphviz(script);
+            }
+        }
+
+        /// <summary>
         /// Определение типов графа
         /// </summary>
-        public enum GraphType
+        public enum Type
         {
             /// <summary>
             /// Неориентированный граф
@@ -73,17 +196,17 @@ namespace tsp
             /// </summary>
             /// <param name="other"> другой объект</param>
             /// <returns> результат сравнения эквивалентности </returns>
-            public override bool Equals(object other) 
+            public override bool Equals(object other)
             {
                 if (other == null)
                     return false;
-               
+
                 if (object.ReferenceEquals(this, other))
                     return true;
-                
+
                 if (this.GetType() != other.GetType())
                     return false;
-                
+
                 return this.Equals(other as Edge);
             }
 
@@ -151,12 +274,13 @@ namespace tsp
             /// </summary>
             /// <param name="edge"> добавляемое ребро </param>
             /// <returns> успешность добавления </returns>
-            public bool Append(Edge edge)
+            public bool Append(Edge e)
             {
-                if (Owner == null || Owner != edge.Owner)
-                    return false;
-                Cost += edge.Cost;
-                edges.AddFirst(edge);
+                if (Owner == null || Owner != e.Owner || edges.Contains(e)) return false;
+
+                Cost += e.Cost;
+                edges.AddFirst(e);
+
                 return true;
             }
 
@@ -168,6 +292,7 @@ namespace tsp
             {
                 foreach (var e in edges)
                     if (Double.IsInfinity(e.Cost)) return false;
+
                 return Owner != null && edges.Count() != 0;
             }
 
@@ -179,6 +304,7 @@ namespace tsp
             public bool IsContain(Edge e)
             {
                 if (e.Owner == null || e.Owner != Owner) return false;
+
                 return edges.Contains(e);
             }
         }
@@ -186,7 +312,7 @@ namespace tsp
         /// <summary>
         /// Тип графа
         /// </summary>
-        public GraphType Type { set; get; }
+        public Type IsType { set; get; }
 
         /// <summary>
         /// Матрица смежности 
@@ -197,9 +323,9 @@ namespace tsp
         /// Создание графа на основе матрицы смежности 
         /// </summary>
         /// <param name="adjacency"></param>
-        public Graph(GraphType type, SqureMatrix adjacency)
+        public Graph(Type type, SqureMatrix adjacency)
         {
-            Type = type;
+            IsType = type;
             Adjacency = SqureMatrix.Copy(adjacency);
         }
 
@@ -209,7 +335,7 @@ namespace tsp
         /// <param name="other"></param>
         public Graph(Graph other)
         {
-            Type = other.Type;
+            IsType = other.IsType;
             Adjacency = SqureMatrix.Copy(other.Adjacency);
         }
 
@@ -220,20 +346,20 @@ namespace tsp
         /// <returns> полный граф.
         /// В случае ошибок, выбрасывается исключение с указанием причины ошибки
         /// </returns>
-        public static Graph CompleteGraphFromFile(string fileName)
+        public static Graph TakenFromFile(string fileName)
         {
             // проверка указанного файла на существование
             if (!File.Exists(fileName)) throw new Exception("Ошибка! Заданного входного файла не существует.");
 
             // считывание всех строк входного файла
-            string[] lines = File.ReadAllLines(fileName);
+            var lines = File.ReadAllLines(fileName);
             int size = lines.Length;
 
             // проверка на пустоту файла
             if (size == 0) throw new Exception("Ошибка! Заданный входной файл пуст.");
 
             // проверка на наличие типа графа 
-            string[] values = lines[0].Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var values = lines.First().Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             if (values.Length != 1) throw new Exception("Ошибка! Не указан тип графа.");
 
             int type; // тип графа
@@ -278,7 +404,7 @@ namespace tsp
                 }
             }
 
-            return new Graph((Graph.GraphType)type, matrix);
+            return new Graph((Graph.Type)type, matrix);
         }
 
         /// <summary>
@@ -311,6 +437,15 @@ namespace tsp
         }
 
         /// <summary>
+        /// Количество ребер в графе
+        /// </summary>
+        /// <returns></returns>
+        public int CountEdge()
+        {
+            return Edges().Count;
+        }
+
+        /// <summary>
         /// Получение ребер графа
         /// </summary>
         /// <returns> ребра </returns>
@@ -323,128 +458,5 @@ namespace tsp
             return edges;
         }
 
-        /// <summary>
-        /// Отрисовка графа средствами Graphviz, используя dot.exe
-        /// </summary>
-        /// <param name="script"> скрипт на языке dot </param>
-        /// <returns> GDI+ избражение графа в виде.
-        /// Если во время отрисовки произошли ошибки, выбрасывается исключение с указанием причины ошибки
-        /// </returns>
-        private Bitmap RenderingInGraphviz(string script)
-        {
-            // проверка существования исполняемого файла Graphviz
-            if (!File.Exists(@"..\Graphviz\dot.exe")) throw new Exception("Приложения dot.exe не найдено");
-
-            // запуск процесса
-            Process dot = new Process();
-            try
-            {
-                // задание параметров процесса
-                dot.StartInfo.UseShellExecute = false;
-                dot.StartInfo.FileName = @"..\Graphviz\dot.exe";
-                dot.StartInfo.Arguments = "-Tpng";
-                dot.StartInfo.RedirectStandardInput = true;
-                dot.StartInfo.RedirectStandardOutput = true;
-                dot.StartInfo.CreateNoWindow = true;
-                dot.Start();
-
-                // передача входных данных для Graphviz
-                dot.StandardInput.Write(script);
-                dot.StandardInput.Close();
-
-                // формирование битового изображения из выходных данных Graphviz
-                Bitmap image = new Bitmap(dot.StandardOutput.BaseStream, true);
-                dot.StandardOutput.Close();
-
-                image.Save("output.png");
-                return image;
-            }
-            catch (Exception e)
-            {
-                throw new Exception("Не возможно отрисовать граф", e);
-            }
-        }
-
-        /// <summary>
-        /// Отрисовка данного графа
-        /// </summary>
-        /// <returns> GDI+ избражение графа в виде.
-        /// Если во время отрисовки произошли ошибки, выбрасывается исключение с указанием причины ошибки
-        /// </returns>
-        public Bitmap Drawing()
-        {
-            // фомирование скрипта на языке dot
-            string script = (Type == GraphType.Directed ? "digraph " : "graph ") + "G { ";
-
-            // взаимосвязь между вершинами, взависимости от типа графа
-            string link = Type == GraphType.Directed ? " -> " : " -- ";
-
-            // задание вершин
-            for (int i = 0; i < CountVertex(); i++)
-                script += (i + 1).ToString() + " ";
-
-            // задание ребер графа
-            for (int i = 0; i < CountVertex(); i++)
-                for (int j = 0; j < CountVertex(); j++)
-                    // если  ребро имеет стоимость не равную бесконечности
-                    if (!Double.IsInfinity(Adjacency[i, j]))
-                        // и позволяет тип графа
-                        if (Type == GraphType.Undirected && j >= i || Type == GraphType.Directed)
-                            script += (i + 1).ToString() + link + (j + 1).ToString() + " [label=" + Adjacency[i, j].ToString() + "] ";
-
-            script += "}";
-
-            // передача скрипта и рендеринг в утилите Graphviz
-            return RenderingInGraphviz(script);
-        }
-
-        /// <summary>
-        /// Отрисовка данного графа с выделенным контуром
-        /// </summary>
-        /// <param name="p"> контур </param>
-        /// <returns> GDI+ избражение графа в виде.
-        /// Если во время отрисовки произошли ошибки, выбрасывается исключение с указанием причины ошибки
-        public Bitmap Drawing(Path p)
-        {
-            // проверка на принадлежность контура графу
-            if (this != p.Owner) throw new Exception("Указанный контур не принадлежит данному графу");
-
-            // фомирование скрипта на языке dot
-            string script = (Type == GraphType.Directed ? "digraph " : "graph ") + "G { ";
-
-            // взаимосвязь между вершинами, взависимости от типа графа
-            string link = Type == GraphType.Directed ? " -> " : " -- ";
-
-            // задание вершин
-            for (int i = 0; i < CountVertex(); i++)
-                script += (i + 1).ToString() + " ";
-
-            // задание ребер графа
-            for (int i = 0; i < CountVertex(); i++)
-            {
-                for (int j = 0; j < CountVertex(); j++)
-                {
-                    // если  ребро имеет стоимость не равную бесконечности
-                    if (!Double.IsInfinity(Adjacency[i, j]))
-                    {
-                        // и позволяет тип графа
-                        if (Type == GraphType.Undirected && j >= i || Type == GraphType.Directed)
-                        {
-                            script += (i + 1).ToString() + link + (j + 1).ToString() + " [label=" + Adjacency[i, j].ToString();
-
-                            // проверка на принадлежность ребра к контуру и выделение цветом на графе
-                            if (p.IsContain(new Edge(this, i, j, Adjacency[i, j])))
-                                script += ", color=red fontcolor=red";
-
-                            script += "] ";
-                        }
-                    }
-                }
-            }
-            script += "}";
-
-            // передача скрипта и рендеринг в утилите Graphviz
-            return RenderingInGraphviz(script);
-        }
     }
 }

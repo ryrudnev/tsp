@@ -51,14 +51,8 @@ namespace tsp
         /// <returns> значение элемента матрицы </returns>
         public double this[int row, int col] 
         {
-            get
-            {
-                return items[row, col];
-            }
-            set
-            {
-                items[row, col] = value;
-            }
+            get { return items[row, col]; }
+            set { items[row, col] = value; }
         }
 
         /// <summary>
