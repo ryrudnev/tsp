@@ -28,17 +28,16 @@ namespace tsp
 
         private void button1_Click(object sender, RoutedEventArgs e)
         {
-            Graph g = Graph.CompleteGraphFromFile("input.txt");
-            g.Drawing();
-            Graph.Path p = new Graph.Path(g);
-            p.Append(new Graph.Edge(g, 0, 3, 4));
-            p.Append(new Graph.Edge(g, 3, 2, 2));
-            p.Append(new Graph.Edge(g, 1, 0, 6));
-            p.Append(new Graph.Edge(g, 4, 1, 4));
-            p.Append(new Graph.Edge(g, 2, 4, 2));
+            Graph g = Graph.TakenFromFile("input.txt");
+            Graph.Painter.Drawing(g);
+            Graph.Path p = new Graph.Path();
+            p.Append(new Graph.Edge(0, 3, 4));
+            p.Append(new Graph.Edge(3, 2, 2));
+            p.Append(new Graph.Edge(1, 0, 6));
+            p.Append(new Graph.Edge(4, 1, 4));
+            p.Append(new Graph.Edge(2, 4, 2));
             bool isOk = p.IsExists();
-            isOk = g.IsOwnedPath(p);
-            g.Drawing(p);
+            Graph.Painter.Drawing(g, p);
         }
     }
 }

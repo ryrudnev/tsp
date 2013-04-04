@@ -28,6 +28,7 @@ namespace tsp
         /// <param name="n"> размер матрицы </param>
         public SqureMatrix(int n)
         {
+            if (n < 2) throw new Exception("Не допустимый размер матрицы");
             items = new double[n, n];
         }
 
@@ -53,16 +54,6 @@ namespace tsp
         {
             get { return items[row, col]; }
             set { items[row, col] = value; }
-        }
-
-        /// <summary>
-        /// Копирование матрицы
-        /// </summary>
-        /// <param name="other"> матрицы над которой будет совершено копирование </param>
-        /// <returns> копия матрицы </returns>
-        public static SqureMatrix Copy(SqureMatrix other)
-        {
-            return new SqureMatrix(other);
         }
     }
 }

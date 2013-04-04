@@ -102,9 +102,6 @@ namespace tsp
 
                 if (p == null) return Drawing(g);
 
-                // проверка на принадлежность контура графу
-                if (g != p.Owner) throw new Exception("Указанный контур не принадлежит данному графу");
-
                 // фомирование скрипта на языке dot
                 string script = (g.IsType == Graph.Type.Directed ? "digraph " : "graph ") + "G { ";
 
@@ -124,7 +121,7 @@ namespace tsp
                         {
                             script += (i + 1) + link + (j + 1) + " [label=" + g.Adjacency[i, j];
 
-                            if (p.IsContain(new Edge(g, i, j, g.Adjacency[i, j]))) script += ", color=red fontcolor=red";
+                            if (p.IsContain(new Edge(i, j, g.Adjacency[i, j]))) script += ", color=red fontcolor=red";
 
                             script += "] ";
                         }
@@ -154,27 +151,31 @@ namespace tsp
         /// <summary>
         /// Ребро (дуга) графа
         /// </summary>
-        public class Edge : IEquatable<Edge>
+        public class Edge : IEquatable<Edge>, IComparable<Edge>
         {
             /// <summary>
             /// Создание ребра
             /// </summary>
-            /// <param name="owner"> граф владелец </param>
             /// <param name="begin"> начало ребра </param>
             /// <param name="end"> конец ребра </param>
             /// <param name="cost"> стоимость ребра </param>
-            public Edge(Graph owner, int begin, int end, double cost)
+            public Edge(int begin, int end, double cost)
             {
-                Owner = owner;
                 Begin = begin;
                 End = end;
                 Cost = cost;
             }
 
             /// <summary>
-            /// Обладатель данного ребра
+            /// Создание ребра на основе другого
             /// </summary>
-            public Graph Owner { get; private set; }
+            /// <param name="other"> другое ребро </param>
+            public Edge(Edge other)
+            {
+                Begin = other.Begin;
+                End = other.End;
+                Cost = other.Cost;
+            }
 
             /// <summary>
             /// Вершина - начало ребра
@@ -192,7 +193,19 @@ namespace tsp
             public double Cost { get; set; }
 
             /// <summary>
-            /// Сравнение как объектов по умолчанию на эквивалентность
+            /// Сравнение ребер по их весам
+            /// </summary>
+            /// <param name="other"> другое ребро </param>
+            /// <returns> -1 - данное ребро меньше другого;
+            ///            0 - данное ребро равно другому
+            ///            1 - данное ребро больше другого</returns>
+            public int CompareTo(Edge other)
+            {
+                return Cost.CompareTo(other);
+            }
+
+            /// <summary>
+            /// Проверка как объектов по умолчанию на эквивалентность
             /// </summary>
             /// <param name="other"> другой объект</param>
             /// <returns> результат сравнения эквивалентности </returns>
@@ -211,7 +224,7 @@ namespace tsp
             }
 
             /// <summary>
-            /// Сравнение двух ребер на эквивалентность 
+            /// Проверка двух ребер на эквивалентность 
             /// </summary>
             /// <param name="other"> другое ребро </param>
             /// <returns> результат сравнения эквивалентности</returns>
@@ -226,7 +239,7 @@ namespace tsp
                 if (this.GetType() != other.GetType())
                     return false;
 
-                return Owner == other.Owner && Begin == other.Begin && End == other.End && Cost == other.Cost;
+                return Begin == other.Begin && End == other.End && Cost == other.Cost;
             }
 
             /// <summary>
@@ -245,24 +258,26 @@ namespace tsp
         public class Path
         {
             /// <summary>
-            /// Создание "пустого" контура для указанного графа
+            /// Создание "пустого" контура
             /// </summary>
-            /// <param name="owner"> граф </param>
-            public Path(Graph owner)
+            public Path()
             {
-                Owner = owner;
-                edges = new LinkedList<Edge>();
+                Edges = new LinkedList<Edge>();
             }
 
             /// <summary>
-            /// Обладатель данного контура
+            /// Создание контура на основе другого контура
             /// </summary>
-            public Graph Owner { get; private set; }
+            /// <param name="other"></param>
+            public Path(Path other)
+            {
+                Edges = new LinkedList<Edge>(other.Edges);
+            }
 
             /// <summary>
             /// Ребра графа входящие в контур 
             /// </summary>
-            public LinkedList<Edge> edges { get; private set; }
+            public LinkedList<Edge> Edges { get; private set; }
 
             /// <summary>
             /// Стоимость контура
@@ -276,10 +291,10 @@ namespace tsp
             /// <returns> успешность добавления </returns>
             public bool Append(Edge e)
             {
-                if (Owner == null || Owner != e.Owner || edges.Contains(e)) return false;
+                if (Edges.Contains(e)) return false;
 
                 Cost += e.Cost;
-                edges.AddFirst(e);
+                Edges.AddFirst(e);
 
                 return true;
             }
@@ -290,10 +305,10 @@ namespace tsp
             /// <returns> результат проверки </returns>
             public bool IsExists()
             {
-                foreach (var e in edges)
+                foreach (var e in Edges)
                     if (Double.IsInfinity(e.Cost)) return false;
 
-                return Owner != null && edges.Count() != 0;
+                return Edges.Count() != 0;
             }
 
             /// <summary>
@@ -303,9 +318,7 @@ namespace tsp
             /// <returns> результат проверки </returns>
             public bool IsContain(Edge e)
             {
-                if (e.Owner == null || e.Owner != Owner) return false;
-
-                return edges.Contains(e);
+                return Edges.Contains(e);
             }
         }
 
@@ -326,7 +339,7 @@ namespace tsp
         public Graph(Type type, SqureMatrix adjacency)
         {
             IsType = type;
-            Adjacency = SqureMatrix.Copy(adjacency);
+            Adjacency = new SqureMatrix(adjacency);
         }
 
         /// <summary>
@@ -336,7 +349,7 @@ namespace tsp
         public Graph(Graph other)
         {
             IsType = other.IsType;
-            Adjacency = SqureMatrix.Copy(other.Adjacency);
+            Adjacency = new SqureMatrix(other.Adjacency);
         }
 
         /// <summary>
@@ -408,26 +421,6 @@ namespace tsp
         }
 
         /// <summary>
-        /// Проверка принадлежности контура графу
-        /// </summary>
-        /// <param name="p"> контур </param>
-        /// <returns> результат проверки </returns>
-        public bool IsOwnedPath(Path p)
-        {
-            return this == p.Owner;
-        }
-
-        /// <summary>
-        /// Проверка принадлежности ребра графу 
-        /// </summary>
-        /// <param name="e"> ребро </param>
-        /// <returns> результат проверки </returns>
-        public bool IsOwnedEdge(Edge e)
-        {
-            return this == e.Owner;
-        }
-
-        /// <summary>
         /// Количество вершин в графе
         /// </summary>
         /// <returns> количество вершин </returns>
@@ -454,7 +447,7 @@ namespace tsp
             List<Edge> edges = new List<Edge>();
             for (int i = 0; i < CountVertex(); i++)
                 for (int j = 0; j < CountVertex(); j++)
-                    edges.Add(new Edge(this, i, j, Adjacency[i, j]));
+                    edges.Add(new Edge(i, j, Adjacency[i, j]));
             return edges;
         }
 
