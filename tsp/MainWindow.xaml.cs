@@ -28,16 +28,11 @@ namespace tsp
 
         private void button1_Click(object sender, RoutedEventArgs e)
         {
-            Graph g = Graph.TakenFromFile("input.txt");
+            var g = Graph.ReadFromFile("input.txt");
             Graph.Painter.Drawing(g);
-            Graph.Path p = new Graph.Path();
-            p.Append(new Graph.Edge(0, 3, 4));
-            p.Append(new Graph.Edge(3, 2, 2));
-            p.Append(new Graph.Edge(1, 0, 6));
-            p.Append(new Graph.Edge(4, 1, 4));
-            p.Append(new Graph.Edge(2, 4, 2));
-            bool isOk = p.IsExists();
-            Graph.Painter.Drawing(g, p);
+
+            var cycle = BranchAndBound.SearchMinHamiltonianCyle(g);
+            var s = cycle;
         }
     }
 }
