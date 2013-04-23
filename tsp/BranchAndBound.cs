@@ -1,129 +1,133 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
-using System.Text;
 
 namespace tsp
 {
-    public class Dsu : ICloneable
+    /// <summary>
+    /// Алгоритм ветвей и границ
+    /// </summary>
+    public class BranchBound : IEnumerable<Bitmap>
     {
-        private List<int> dp = new List<int>();
-
-        public Dsu() { }
-
-        public Dsu(int n) 
-        { 
-            Init(n); 
-        }
-
-        public Dsu(Dsu other) 
+        /// <summary>
+        /// Непересекающиеся множества
+        /// </summary>
+        public class Dsu : ICloneable
         {
-            var clone = other.Clone() as Dsu;
+            private List<int> p = new List<int>();
 
-            dp = clone.dp;
-        }
+            #region Конструторы
 
-        public void Init(int n)
-        {
-            dp = new List<int>(n);
-            for (int i = 0; i < n; i++) dp.Add(i);
-        }
+            /// <summary>
+            /// Создание пустого множества
+            /// </summary>
+            public Dsu() { }
 
-        public int Find(int x)
-        {
-            return dp[x] == x ? x : dp[x] = Find(dp[x]);
-        }
-
-        public void Union(int x, int y)
-        {
-            dp[Find(x)] = Find(y);
-        }
-
-        public object Clone()
-        {
-            var clone = new Dsu();
-
-            clone.dp = new List<int>(dp);
-
-            return clone as object;
-        }
-    }
-
-    public class BranchAndBound
-    {
-        public class CycleInfo : ICloneable
-        {
-            public CycleInfo() { }
-
-            public CycleInfo(Dsu dsu, ReducedMatrix matrix, Graph.Cycle cycle)
+            /// <summary>
+            /// Создание множества указанного размера
+            /// </summary>
+            /// <param name="n"></param>
+            public Dsu(int n)
             {
-                DSU = dsu;
-                Matrix = matrix;
-                Cycle = cycle;
+                Init(n);
             }
 
-            public CycleInfo(CycleInfo other)
-            {
-                var clone = other.Clone() as CycleInfo;
+            #endregion
 
-                DSU = clone.DSU;
-                Matrix = clone.Matrix;
-                Cycle = clone.Cycle;
+            /// <summary>
+            /// Инициализация множества
+            /// </summary>
+            /// <param name="n"></param>
+            public void Init(int n)
+            {
+                p = new List<int>(n);
+                for (int i = 0; i < n; ++i)
+                    p.Add(i);
             }
 
-            public Dsu DSU { private set; get; }
-
-            public ReducedMatrix Matrix { set; get; }
-
-            public Graph.Cycle Cycle { set; get; }
-
-            public void EliminateSubroute(Graph.Edge e)
+            /// <summary>
+            /// Нахождения индефикатора множества, которому принадлежит данный элемент 
+            /// </summary>
+            /// <param name="x">элемент множества</param>
+            /// <returns></returns>
+            public int Find(int x)
             {
-                for (int i = 0; i < Matrix.Size; ++i)
-                {
-                    for (int j = 0; j < Matrix.Size; ++j)
-                    {
-                        if (DSU.Find(e.Begin) == DSU.Find(i) && DSU.Find(e.End) == DSU.Find(j))
-                            Matrix[j, i] = double.PositiveInfinity;
-                    }
-                }
-                DSU.Union(e.Begin, e.End);
+                return p[x] == x ? x : p[x] = Find(p[x]);
             }
 
+            /// <summary>
+            /// Объединение двух множеств, которым принадлежат указанные элементы 
+            /// </summary>
+            /// <param name="x">первый элемент</param>
+            /// <param name="y">второй элемент</param>
+            public void Union(int x, int y)
+            {
+                p[Find(x)] = Find(y);
+            }
+
+            /// <summary>
+            /// Клонирование
+            /// </summary>
+            /// <returns>клон объекта</returns>
             public object Clone()
             {
-                var clone = new CycleInfo();
-
-                clone.DSU = DSU.Clone() as Dsu;
-                clone.Matrix = new ReducedMatrix(Matrix);
-                clone.Cycle = Cycle.Clone() as Graph.Cycle;
+                var clone = new Dsu();
+                clone.p = new List<int>(p);
 
                 return clone as object;
             }
         }
 
-        public class ReducedMatrix : SqureMatrix
+        /// <summary>
+        /// Редуцированная матрица
+        /// </summary>
+        public class ReductionMatrix : Digraph.AdjacencyMatrix
         {
-            public int RealSize { get; private set; }
+            #region Конструторы
 
-            public ReducedMatrix(int n)
+            /// <summary>
+            /// Создание матрицы указанного размера
+            /// </summary>
+            /// <param name="n">размер матрицы</param>
+            public ReductionMatrix(int n)
                 : base(n)
             {
                 RealSize = Size;
             }
 
-            public ReducedMatrix(SqureMatrix smatrix)
-                : base(smatrix)
+            /// <summary>
+            /// Создание матрицы на основе матрциы смежности
+            /// </summary>
+            /// <param name="matrix">матрца смежности</param>
+            public ReductionMatrix(Digraph.AdjacencyMatrix matrix)
+                : base(matrix)
             {
                 RealSize = Size;
             }
 
-            public ReducedMatrix(ReducedMatrix rmatrix)
-                : base(rmatrix)
+            /// <summary>
+            /// Создание матрицы на основе другой матрицы
+            /// </summary>
+            /// <param name="other">другая матрица</param>
+            public ReductionMatrix(ReductionMatrix other)
+                : base(other)
             {
-                RealSize = rmatrix.RealSize;
+                RealSize = other.RealSize;
             }
 
+            #endregion Конструторы
+
+            /// <summary>
+            /// Размер матрицы без "вычеркнутых" строк и столбцов 
+            /// </summary>
+            public int RealSize { get; private set; }
+
+            /// <summary>
+            /// Приведение матрицы
+            /// </summary>
+            /// <returns></returns>
             public double Reduce()
             {
                 double min, minInRows = 0;
@@ -133,10 +137,10 @@ namespace tsp
                     if (min != 0 && min != double.PositiveInfinity)
                     {
                         minInRows += min;
-                        for (int j = 0; j < Size; j++) this[i, j] -= min;
+                        for (int j = 0; j < Size; j++)
+                            this[i, j] -= min;
                     }
                 }
-
                 double minInColumns = 0;
                 for (int i = 0; i < Size; i++)
                 {
@@ -144,117 +148,187 @@ namespace tsp
                     if (min != 0 && min != double.PositiveInfinity)
                     {
                         minInColumns += min;
-                        for (int j = 0; j < Size; j++) this[j, i] -= min;
-                    }                   
+                        for (int j = 0; j < Size; j++)
+                            this[j, i] -= min;
+                    }
                 }
 
                 return minInRows + minInColumns;
             }
 
+            /// <summary>
+            /// Нахождение минимума в строке
+            /// </summary>
+            /// <param name="row">номер строки</param>
+            /// <param name="notIncludeColumn">номер столбца, который не учитывается в нахождение минимума</param>
+            /// <returns>минимум в строке</returns>
             public double MinInRow(int row, int notIncludeColumn = -1)
             {
                 double min = double.PositiveInfinity;
                 for (int i = 0; i < Size; i++)
-                    if (notIncludeColumn != i && min > this[row, i]) min = this[row, i];
+                    if (notIncludeColumn != i && min > this[row, i])
+                        min = this[row, i];
 
                 return min;
             }
 
+            /// <summary>
+            /// Нахождение минимума в столбце
+            /// </summary>
+            /// <param name="column">номер столбца</param>
+            /// <param name="notIncludeRow">номер строки, который не учитывается в нахождение минимума</param>
+            /// <returns>минимум в столбце</returns>
             public double MinInColumn(int column, int notIncludeRow = -1)
             {
                 double min = double.PositiveInfinity;
                 for (int i = 0; i < Size; i++)
-                    if (notIncludeRow != i && min > this[i, column]) min = this[i, column];
+                    if (notIncludeRow != i && min > this[i, column])
+                        min = this[i, column];
 
                 return min;
             }
 
-            public void DeleteRowAndColumn(int row, int column)
+            /// <summary>
+            /// Исключение указанной строки и столбца редуцированной матрице
+            /// </summary>
+            /// <param name="row">номер строки</param>
+            /// <param name="column">номер столбца</param>
+            public void DeleteRowColumn(int row, int column)
             {
-                for (int i = 0; i < Size; i++) this[row, i] = double.PositiveInfinity;
-                for (int i = 0; i < Size; i++) this[i, column] = double.PositiveInfinity;
+                for (int i = 0; i < Size; i++)
+                    this[row, i] = double.PositiveInfinity;
+                for (int i = 0; i < Size; i++)
+                    this[i, column] = double.PositiveInfinity;
 
                 RealSize--;
             }
         }
 
-        public class Branch : IComparable<Branch>, ICloneable
+        /// <summary>
+        /// Ветвление в методе ветвей и границ
+        /// </summary>
+        public class Branch
         {
+            /// <summary>
+            /// Направление ветвления
+            /// </summary>
             public enum Type
             {
                 Left, Right
             }
 
-            public Graph.Edge Edge { set; get; }
+            #region Конструкторы
 
-            public double Bound { set; get; }
-
-            public CycleInfo Info { set; get; }
-
-            public Branch Right { set; get; }
-
-            public Branch Left { set; get; }
-
+            /// <summary>
+            /// Создание пустого ветвления
+            /// </summary>
             public Branch() { }
 
-            public Branch(double bound, Graph.Edge edge, CycleInfo info)
+            /// <summary>
+            /// Создания ветвления
+            /// </summary>
+            /// <param name="bound">нижняя граница ветвления</param>
+            /// <param name="matrix">текущая редуцированная матрица</param>
+            /// <param name="edge">ребро ветвления</param>
+            /// <param name="path">текущий маршрут</param>
+            /// <param name="dsu">текущее множество вершин</param>
+            public Branch(double bound, ReductionMatrix matrix, Digraph.Edge edge, Digraph.Path path, Dsu dsu)
             {
                 Bound = bound;
+                Matrix = matrix;
                 Edge = edge;
-                Info = info;
+                Path = path;
+                SetVertex = dsu;
             }
 
-            public Branch(Branch other)
-            {
-                var clone = other.Clone() as Branch;
+            #endregion
 
-                Bound = clone.Bound;
-                Edge = clone.Edge;
-                Info = clone.Info;
-                Right = clone.Right;
-                Left = clone.Left;
-            }
+            /// <summary>
+            /// Нижняя граница ветвления
+            /// </summary>
+            public double Bound { set; get; }
 
-            public int CompareTo(Branch other)
-            {
-                return Bound.CompareTo(other.Bound);
-            }
+            /// <summary>
+            /// Ребро ветвления
+            /// </summary>
+            public Digraph.Edge Edge { set; get; }
 
-            public object Clone()
-            {
-                var clone = new Branch();
-                clone.Bound = Bound;
-                clone.Edge = Edge.Clone() as Graph.Edge;
-                clone.Info = Info.Clone() as CycleInfo;
-                clone.Right = Right;
-                clone.Left = Left;
+            /// <summary>
+            /// Текущий маршрут
+            /// </summary>
+            public Digraph.Path Path { set; get; }
 
-                return clone;
-            }
+            /// <summary>
+            /// Множество вершин для данного ветвления
+            /// </summary>
+            public Dsu SetVertex { set; get; }
+
+            /// <summary>
+            /// Редуцированная матрица
+            /// </summary>
+            public ReductionMatrix Matrix { set; get; }
+
+            /// <summary>
+            /// Правый потомок ветвления
+            /// </summary>
+            public Branch Right { set; get; }
+
+            /// <summary>
+            /// Левый потомок ветвления
+            /// </summary>
+            public Branch Left { set; get; }
         }
 
+        /// <summary>
+        /// Дерево ветвления в методе ветвей и границ
+        /// </summary>
         public class TreeBranching
         {
-            public Branch Root { set; private get; }
+            /// <summary>
+            /// Корень дерева ветвления
+            /// </summary>
+            public Branch Root { private set; get; }
 
+            #region Конструкторы
+
+            /// <summary>
+            /// Создание дерева ветвления
+            /// </summary>
+            /// <param name="root">корень дерева</param>
             public TreeBranching(Branch root)
             {
                 Root = root;
             }
 
+            #endregion
+
+            /// <summary>
+            /// Добавление ветвления в дерево
+            /// </summary>
+            /// <param name="parent">родитель</param>
+            /// <param name="direction">направление ветвления</param>
+            /// <param name="b">ветвление</param>
+            /// <returns></returns>
             public Branch Add(Branch parent, Branch.Type direction, Branch b)
             {
-                if (direction == Branch.Type.Left) parent.Left = b;
-                else parent.Right = b;
+                if (direction == Branch.Type.Left)
+                    parent.Left = b;
+                else
+                    parent.Right = b;
 
                 return b;
             }
 
+            /// <summary>
+            /// Получение листьев дерева
+            /// </summary>
+            /// <returns>листья дерева ветвления</returns>
             public List<Branch> Leaves()
             {
                 var leaves = new List<Branch>();
 
-                if (Root == null) return leaves;
+                if (Root == null)
+                    return leaves;
 
                 var stack = new Stack<Branch>();
                 stack.Push(Root);
@@ -262,100 +336,337 @@ namespace tsp
                 while (stack.Count > 0)
                 {
                     var branch = stack.Pop();
-                    if (branch.Left == null && branch.Right == null) leaves.Add(branch);
-                    if (branch.Right != null) stack.Push(branch.Right);
-                    if (branch.Left != null) stack.Push(branch.Left);
+                    if (branch.Left == null && branch.Right == null)
+                        leaves.Add(branch);
+                    if (branch.Right != null)
+                        stack.Push(branch.Right);
+                    if (branch.Left != null)
+                        stack.Push(branch.Left);
                 }
-
                 return leaves;
             }
         }
 
-        public static Graph.Cycle SearchMinHamiltonianCyle(Graph g)
+        /// <summary>
+        /// Решение задачи коммивояжера методом ветвей и границ
+        /// </summary>
+        /// <param name="graph">граф</param>
+        /// <returns>маршрут коммивояжера</returns>
+        public static Digraph.Path Tsp(Digraph graph)
         {
-            double minBound = double.PositiveInfinity;
+            // минимальный маршрут
+            var minPath = new Digraph.Path();
 
-            var minHamilton = new Graph.Cycle();
+            // если граф пуст
+            if (graph.CountVertex() == 0)
+            {
+                // пустой мпршрут
+                return new Digraph.Path();
+            }
+            // если граф имеет одну вершину
+            else if (graph.CountVertex() == 1)
+            {
+                minPath.Append(new Digraph.Edge(0, 0, graph[0, 0]));
+                // маршрут для одной вершины
+                return minPath;
+            }
+            // если граф имеет две вершины
+            else if (graph.CountVertex() == 2)
+            {
+                minPath.Append(new Digraph.Edge(0, 1, graph[0, 1]));
+                minPath.Append(new Digraph.Edge(1, 0, graph[1, 0]));
+                // маршрут для двух вершин
+                return minPath;
+            }
+            // минимальная нижняя граница всех ветвлений
+            double lowBound = double.PositiveInfinity;
 
-            var pMatrix = new ReducedMatrix(g.Adjacency);
+            // редуцированная матрица родительского ветвления
+            var pMatrix = new ReductionMatrix(graph.Adjacency);
 
-            var pBranch = new Branch(pMatrix.Reduce(), null, new CycleInfo(new Dsu(g.CountVertex()), pMatrix, new Graph.Cycle()));
+            /// Приведение матрицы и создание родительского ветвления
+            var pBranch = new Branch(pMatrix.Reduce(), pMatrix, null, new Digraph.Path(), new Dsu(graph.CountVertex()));
 
+            /// Создание дерева ветления
             var tree = new TreeBranching(pBranch);
 
             do
             {
-                var lInfo = pBranch.Info.Clone() as CycleInfo;
+                // редуцированная матрица левого потомка
+                var lMatrix = new ReductionMatrix(pBranch.Matrix);
+                // ребра с нулевой стоимостью
+                var zeroEdges = new List<Digraph.Edge>();
+                // Получение всех ребер и соответсвующих штрафов
+                for (int i = 0; i < lMatrix.Size; i++)
+                    for (int j = 0; j < lMatrix.Size; j++)
+                        if (lMatrix[i, j] == 0)
+                            zeroEdges.Add(new Digraph.Edge(i, j, lMatrix.MinInRow(i, j) + lMatrix.MinInColumn(j, i)));
 
-                var zeroEdges = new List<Graph.Edge>();
+                // если нет ребер ветвления - нет маршрута коммивояжера
+                if (zeroEdges.Count == 0)
+                    return new Digraph.Path();
 
-                for (int i = 0; i < lInfo.Matrix.Size; i++)
-                {
-                    for (int j = 0; j < lInfo.Matrix.Size; j++)
-                    {
-                        if (lInfo.Matrix[i, j] == 0) 
-                            zeroEdges.Add(
-                            new Graph.Edge(i, j, lInfo.Matrix.MinInRow(i, j) + lInfo.Matrix.MinInColumn(j, i))
-                            );
-                    }
-                }
-
+                /// Определение ребра ветвления - ребра с максимальным штрафом
                 var bEdge = zeroEdges.OrderByDescending(e => e.Cost).ToList().First();
 
-                lInfo.Matrix[bEdge.Begin, bEdge.End] = double.PositiveInfinity;
+                /// Процесс ветвления - не включая данное ребро 
+                lMatrix[bEdge.Begin, bEdge.End] = double.PositiveInfinity;
 
-                var lBranch = new Branch(pBranch.Bound + bEdge.Cost,
-                    new Graph.Edge(-bEdge.Begin, -bEdge.End, double.PositiveInfinity),
-                    lInfo
+                /// Создание левого потомка ветвления
+                var lBranch = new Branch(pBranch.Bound + bEdge.Cost, // нижняя граница текущего ветвления
+                    lMatrix,                                            // редуцированния матрица
+                    new Digraph.Edge(-bEdge.Begin, -bEdge.End, double.PositiveInfinity), // без исходного ребра ветвления
+                    pBranch.Path.Clone() as Digraph.Path, // без изменений маршрута
+                    pBranch.SetVertex.Clone() as Dsu    // без изменений множеств вершин
                     );
-
+                // добавление ветвления в дерево
                 tree.Add(pBranch, Branch.Type.Left, lBranch);
 
+                /// Процесс ветления - включая данное ребро
+                var rMatrix = new ReductionMatrix(pBranch.Matrix);
+                var rVertex = pBranch.SetVertex.Clone() as Dsu;
 
-                var rInfo = pBranch.Info.Clone() as CycleInfo;
+                /// Исключение подмаршрутов для данной матрицы и множества вершин
+                for (int i = 0; i < rMatrix.Size; i++)
+                    for (int j = 0; j < rMatrix.Size; j++)
+                        if (rVertex.Find(bEdge.Begin) == rVertex.Find(i) && rVertex.Find(bEdge.End) == rVertex.Find(j))
+                            rMatrix[j, i] = double.PositiveInfinity;
+                // объединение вершин данного ребра в одно множество 
+                rVertex.Union(bEdge.Begin, bEdge.End);
+                // исключение строки и столбца соответсвующие начала и конца ребра
+                rMatrix.DeleteRowColumn(bEdge.Begin, bEdge.End);
 
-                rInfo.EliminateSubroute(bEdge);
-                rInfo.Matrix.DeleteRowAndColumn(bEdge.Begin, bEdge.End);
+                // формирование добавляемого ребра
+                var rEdge = new Digraph.Edge(bEdge.Begin, bEdge.End, graph[bEdge.Begin, bEdge.End]);
+                // добавление в маршрут
+                var rPath = pBranch.Path.Clone() as Digraph.Path;
+                rPath.Append(rEdge);
 
-                /*rMatrix[bEdge.End, bEdge.Begin] = double.PositiveInfinity;
-                rMatrix.DeleteRowAndColumn(bEdge.Begin, bEdge.End);
-                */
-
-                var addEdge = new Graph.Edge(bEdge.Begin, bEdge.End, g.Adjacency[bEdge.Begin, bEdge.End]);
-                rInfo.Cycle.Append(addEdge);
-
-                var rBranch = new Branch(pBranch.Bound + rInfo.Matrix.Reduce(),
-                    addEdge,
-                    rInfo
+                /// Создание правого потомка ветвления
+                var rBranch = new Branch(pBranch.Bound + rMatrix.Reduce(), // нижняя граница текущего ветвления
+                    rMatrix, // редуцированния матрица
+                    rEdge,   // с исходным ребром ветвления
+                    rPath,   // с изменением маршрута
+                    rVertex  // с изменением множеств вершин
                     );
-
+                // добавление ветвления в дерево
                 tree.Add(pBranch, Branch.Type.Right, rBranch);
 
-                if (rInfo.Matrix.RealSize == 2)
+                /// Проверка на достаточность размера матрцицы
+                if (rMatrix.RealSize == 2)
                 {
-                    for (int i = 0; i < rInfo.Matrix.Size; i++)
-                    {
-                        for (int j = 0; j < rInfo.Matrix.Size; j++)
-                        {
-                            if (rInfo.Matrix[i, j] == 0)
-                                rBranch.Info.Cycle.Append(
-                                new Graph.Edge(i, j, g.Adjacency[i, j])
-                                );
-                        }
-                    }
+                    /// Добавление оставщихся ребер в маршрут
+                    for (int i = 0; i < rMatrix.Size; i++)
+                        for (int j = 0; j < rMatrix.Size; j++)
+                            if (rMatrix[i, j] == 0)
+                            {
+                                // добавление в маршрут
+                                rPath.Append(new Digraph.Edge(i, j, graph[i, j]));
+                            }
 
-                    if (rBranch.Bound < minBound)
+                    /// Определение нового маршрута с более низкой стоимостью
+                    if (rBranch.Bound < lowBound)
                     {
-                        minBound = rBranch.Bound;
-                        minHamilton = rBranch.Info.Cycle;
+                        // новая нижняя граница
+                        lowBound = rBranch.Bound;
+                        // новый маршрут
+                        minPath = rBranch.Path;
                     }
                 }
 
+                /// Выбор новой родительской вершины
                 pBranch = tree.Leaves().OrderBy(b => b.Bound).ToList().First();
 
-            } while (minBound > pBranch.Bound);
+            } while (lowBound > pBranch.Bound);
 
-            return minHamilton;
+            // минимальный маршрут коммивояжера
+            return minPath;
         }
+
+        #region Итерационное ветвление метода ветвей и границ
+
+        // дерево ветвления алгоритма
+        private TreeBranching tree;
+
+        // текущее ветвление
+        private Branch current;
+
+        // минимальная нижняя граница всех ветвлений
+        private double minLowBound;
+
+        #region Конструкторы
+
+        public BranchBound(Digraph graph)
+        {
+            Graph = graph;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Орг. граф
+        /// </summary>
+        public Digraph Graph { set; get; }
+
+        /// <summary>
+        /// Минимальный маршрут коммивояжера
+        /// </summary>
+        public Digraph.Path MinPath { private set; get; }
+
+        public IEnumerator<Bitmap> GetEnumerator()
+        {
+            // минимальный маршрут
+            MinPath = new Digraph.Path();
+
+            // если граф пуст
+            if (Graph.CountVertex() == 0)
+            {
+                // пустой мпршрут
+                yield break;
+            }
+            // если граф имеет одну вершину
+            else if (Graph.CountVertex() == 1)
+            {
+                MinPath.Append(new Digraph.Edge(0, 0, Graph[0, 0]));
+                // маршрут для одной вершины
+                yield break;
+            }
+            // если граф имеет две вершины
+            else if (Graph.CountVertex() == 2)
+            {
+                MinPath.Append(new Digraph.Edge(0, 1, Graph[0, 1]));
+                MinPath.Append(new Digraph.Edge(1, 0, Graph[1, 0]));
+                // маршрут для двух вершин
+                yield break;
+            }
+
+            // минимальная нижняя граница всех ветвлений
+            minLowBound = double.PositiveInfinity;
+
+            // редуцированная матрица родительского ветвления
+            var pMatrix = new ReductionMatrix(Graph.Adjacency);
+
+            /// Приведение матрицы и создание родительского ветвления
+            current = new Branch(pMatrix.Reduce(), pMatrix, null, new Digraph.Path(), new Dsu(Graph.CountVertex()));
+
+            /// Создание дерева ветления
+            tree = new TreeBranching(current);
+
+            do
+            {
+                // редуцированная матрица левого потомка
+                var lMatrix = new ReductionMatrix(current.Matrix);
+                // ребра с нулевой стоимостью
+                var zeroEdges = new List<Digraph.Edge>();
+                // Получение всех ребер и соответсвующих штрафов
+                for (int i = 0; i < lMatrix.Size; i++)
+                    for (int j = 0; j < lMatrix.Size; j++)
+                        if (lMatrix[i, j] == 0)
+                            zeroEdges.Add(new Digraph.Edge(i, j, lMatrix.MinInRow(i, j) + lMatrix.MinInColumn(j, i)));
+
+                // если нет ребер ветвления - нет маршрута коммивояжера
+                if (zeroEdges.Count == 0)
+                {
+                    MinPath = new Digraph.Path();
+                    yield break;
+                }
+                /// Определение ребра ветвления - ребра с максимальным штрафом
+                var bEdge = zeroEdges.OrderByDescending(e => e.Cost).ToList().First();
+
+                /// Процесс ветвления - не включая данное ребро 
+                lMatrix[bEdge.Begin, bEdge.End] = double.PositiveInfinity;
+
+                /// Создание левого потомка ветвления
+                var lBranch = new Branch(current.Bound + bEdge.Cost, // нижняя граница текущего ветвления
+                    lMatrix,                                            // редуцированния матрица
+                    new Digraph.Edge(-bEdge.Begin, -bEdge.End, double.PositiveInfinity), // без исходного ребра ветвления
+                    current.Path.Clone() as Digraph.Path, // без изменений маршрута
+                    current.SetVertex.Clone() as Dsu    // без изменений множеств вершин
+                    );
+                // добавление ветвления в дерево
+                tree.Add(current, Branch.Type.Left, lBranch);
+
+                /// Процесс ветления - включая данное ребро
+                var rMatrix = new ReductionMatrix(current.Matrix);
+                var rVertex = current.SetVertex.Clone() as Dsu;
+
+                /// Исключение подмаршрутов для данной матрицы и множества вершин
+                for (int i = 0; i < rMatrix.Size; i++)
+                    for (int j = 0; j < rMatrix.Size; j++)
+                        if (rVertex.Find(bEdge.Begin) == rVertex.Find(i) && rVertex.Find(bEdge.End) == rVertex.Find(j))
+                            rMatrix[j, i] = double.PositiveInfinity;
+                // объединение вершин данного ребра в одно множество 
+                rVertex.Union(bEdge.Begin, bEdge.End);
+                // исключение строки и столбца соответсвующие начала и конца ребра
+                rMatrix.DeleteRowColumn(bEdge.Begin, bEdge.End);
+
+                // формирование добавляемого ребра
+                var rEdge = new Digraph.Edge(bEdge.Begin, bEdge.End, Graph[bEdge.Begin, bEdge.End]);
+                // добавление в маршрут
+                var rPath = current.Path.Clone() as Digraph.Path;
+                rPath.Append(rEdge);
+
+                /// Создание правого потомка ветвления
+                var rBranch = new Branch(current.Bound + rMatrix.Reduce(), // нижняя граница текущего ветвления
+                    rMatrix, // редуцированния матрица
+                    rEdge,   // с исходным ребром ветвления
+                    rPath,   // с изменением маршрута
+                    rVertex  // с изменением множеств вершин
+                    );
+                // добавление ветвления в дерево
+                tree.Add(current, Branch.Type.Right, rBranch);
+
+                /// Проверка на достаточность размера матрцицы
+                if (rMatrix.RealSize == 2)
+                {
+                    current = rBranch;
+                    /// Добавление оставщихся ребер в маршрут
+                    for (int i = 0; i < current.Matrix.Size; i++)
+                        for (int j = 0; j < current.Matrix.Size; j++)
+                            if (rMatrix[i, j] == 0)
+                            {
+                                // отображения дерева ветвлений на текущей итерации
+                                yield return Painter.Drawing(tree);
+
+                                var edge = new Digraph.Edge(i, j, Graph[i, j]);
+                                // добавление в маршрут
+                                current.Path.Append(edge);
+                                // добавление в дерево ветвлений
+                                var branch = new Branch(current.Bound, current.Matrix, edge, current.Path, current.SetVertex);
+
+                                tree.Add(current, Branch.Type.Right, branch);
+
+                                // новый родитель
+                                current = branch;
+                            }
+
+                    /// Определение нового маршрута с более низкой стоимостью
+                    if (current.Bound < minLowBound)
+                    {
+                        // новая нижняя граница
+                        minLowBound = current.Bound;
+                        // новый маршрут
+                        MinPath = current.Path;
+                    }
+                }
+
+                // отображения дерева ветвлений на текущей итерации
+                yield return Painter.Drawing(tree);
+
+                /// Выбор новой родительской вершины
+                current = tree.Leaves().OrderBy(b => b.Bound).ToList().First();
+
+            } while (minLowBound > current.Bound);
+
+            // минимальный маршрут коммивояжера
+            yield break;
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        #endregion
     }
 }

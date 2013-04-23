@@ -1,0 +1,9 @@
+﻿<Window x:Class="tsp.WaitingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Выполнение!" Height="122" Width="428" ResizeMode="NoResize" >
+    <Grid>
+        <Label Content="Идет поиск маршрута коммивояжера. Пожалуйста подождите ..." Height="27" HorizontalAlignment="Center" Margin="12,12,0,0" Name="label1" VerticalAlignment="Top" Width="390" />
+        <ProgressBar Margin="18,45,0,9" Name="progressBar1" IsIndeterminate="True" HorizontalAlignment="Left" Width="363" />
+    </Grid>
+</Window>
