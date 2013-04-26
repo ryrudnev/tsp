@@ -63,8 +63,8 @@ namespace tsp
 
             for (int i = 0; i < graph.CountVertex(); i++)
                 for (int j = 0; j < graph.CountVertex(); j++)
-                    if (!Double.IsInfinity(graph[i, j]))
-                        script += (i + 1) + " -> " + (j + 1) + " [label=" + graph[i, j] + "] ";
+                    if (!float.IsInfinity(graph[i, j]))
+                        script += (i + 1) + " -> " + (j + 1) + " [label=\"" + graph[i, j] + "\"] ";
 
             script += "}";
 
@@ -92,11 +92,12 @@ namespace tsp
 
             for (int i = 0; i < graph.CountVertex(); i++)
                 for (int j = 0; j < graph.CountVertex(); j++)
-                    if (!Double.IsInfinity(graph[i, j]))
+                    if (!float.IsInfinity(graph[i, j]))
                     {
-                        script += (i + 1) + " -> " + (j + 1) + " [label=" + graph[i, j];
+                        script += (i + 1) + " -> " + (j + 1) + " [label=\"" + graph[i, j] + "\"";
 
-                        if (path.IsContain(new Digraph.Edge(i, j, graph[i, j]))) script += ", color=\"red\"";
+                        if (path.IsContain(new Digraph.Edge(i, j, graph[i, j]))) 
+                            script += ", color=\"red\"";
 
                         script += "] ";
                     }
@@ -111,47 +112,51 @@ namespace tsp
         /// </summary>
         /// <param name="tree">дерево ветвления</param>
         /// <returns>битовое изображение</returns>
-        public static Bitmap Drawing(BranchBound.TreeBranching tree)
+        public static Bitmap Drawing(BranchAndBound.TreeBranch tree)
         {
             if (tree == null || tree.Root == null)
                 throw new Exception("Невозможно отрисовать дерево ветвлений. Дерево пусто.");
 
-            string script = "graph G { nrankdir = LR ";
+            uint no = 0;
 
-            var queue = new Queue<BranchBound.Branch>();
-            queue.Enqueue(tree.Root);
+            var current = tree.Root;
 
-            while (queue.Count > 0)
+            string script = "graph G { nrankdir = LR node" + no + "[label = " + "\"" + current.LowerBound + "\"] ", scriptMain = "";
+
+            var dictionaryBranch = new Dictionary<BranchAndBound.Branch, uint>();
+            dictionaryBranch.Add(current, no++);
+
+            var queue = new Queue<BranchAndBound.Branch>();
+
+            for(;;)
             {
-                var branch = queue.Dequeue();
-
-                string strParent = "\"" + branch.Bound;
-
-                if (branch.Edge != null)
-                    strParent += "\n" + (branch.Edge.Begin < 0 || branch.Edge.End < 0 ? "/(" : "(")
-                        + (Math.Abs(branch.Edge.Begin) + 1) + ", " + (Math.Abs(branch.Edge.End) + 1) + ")\"";
-                else
-                    strParent += "\"";
-
-                script += strParent + " ";
-
-                if (branch.Left != null)
+                if (current.Left != null)
                 {
-                    string strLChild = "\"" + branch.Left.Bound + "\n" + (branch.Left.Edge.Begin < 0 || branch.Left.Edge.End < 0 ? "/(" : "(")
-                        + (Math.Abs(branch.Left.Edge.Begin) + 1) + ", " + (Math.Abs(branch.Left.Edge.End) + 1) + ")\"";
-                    script += strParent + " -- " + strLChild + " ";
+                    dictionaryBranch.Add(current.Left, no++);
+                    queue.Enqueue(current.Left);
 
-                    queue.Enqueue(branch.Left);
+                    scriptMain = "node" + dictionaryBranch[current.Left] + "[label = " + "\"" + current.Left.LowerBound + "\n" + (current.Left.BranchingEdge.Begin < 0 || current.Left.BranchingEdge.End < 0 ? "/(" : "(")
+                       + (Math.Abs(current.Left.BranchingEdge.Begin) + 1) + ", " + (Math.Abs(current.Left.BranchingEdge.End) + 1) + ")\"] " + scriptMain;
                 }
-                if (branch.Right != null)
+                if (current.Right != null)
                 {
-                    string strRChild = "\"" + branch.Right.Bound + "\n" + (branch.Right.Edge.Begin < 0 || branch.Right.Edge.End < 0 ? "/(" : "(")
-                    + (Math.Abs(branch.Right.Edge.Begin) + 1) + ", " + (Math.Abs(branch.Right.Edge.End) + 1) + ")\"";
-                    script += strParent + " -- " + strRChild + " ";
+                    dictionaryBranch.Add(current.Right, no++);
+                    queue.Enqueue(current.Right);
 
-                    queue.Enqueue(branch.Right);
+                    scriptMain = "node" + dictionaryBranch[current.Right] + "[label = " + "\"" + current.Right.LowerBound + "\n" + (current.Right.BranchingEdge.Begin < 0 || current.Right.BranchingEdge.End < 0 ? "/(" : "(")
+                        + (Math.Abs(current.Right.BranchingEdge.Begin) + 1) + ", " + (Math.Abs(current.Right.BranchingEdge.End) + 1) + ")\"] " + scriptMain;
                 }
+
+                if (queue.Count == 0)
+                    break;
+
+                current = queue.Dequeue();
+
+                scriptMain += "node" + dictionaryBranch[current.Parent] + " -- " + "node" + dictionaryBranch[current] + " ";
             }
+
+            if (!string.IsNullOrEmpty(scriptMain))
+                script += scriptMain;
 
             script += "}";
 

@@ -14,7 +14,7 @@ namespace tsp
         /// </summary>
         public class AdjacencyMatrix : ICloneable
         {
-            private double[,] entries;
+            private float[,] entries;
 
             /// <summary>
             /// Размер матрицы смежности
@@ -30,7 +30,7 @@ namespace tsp
             public AdjacencyMatrix(int n)
             {
                 Size = n;
-                entries = new double[Size, Size];
+                entries = new float[Size, Size];
             }
 
             /// <summary>
@@ -53,7 +53,7 @@ namespace tsp
             /// <param name="row">индекс строки</param>
             /// <param name="col">индекс столбца</param>
             /// <returns>значение элемента матрицы</returns>
-            public double this[int row, int col]
+            public float this[int row, int col]
             {
                 get { return entries[row, col]; }
                 set { entries[row, col] = value; }
@@ -88,7 +88,7 @@ namespace tsp
             /// <param name="begin">вершина-начало</param>
             /// <param name="end">вершина-конец</param>
             /// <param name="cost">стоимость ребра</param>
-            public Edge(int begin, int end, double cost)
+            public Edge(int begin, int end, float cost)
             {
                 Begin = begin;
                 End = end;
@@ -110,7 +110,7 @@ namespace tsp
             /// <summary>
             /// Стоимость ребра
             /// </summary>
-            public double Cost { get; set; }
+            public float Cost { get; set; }
 
             /// <summary>
             /// Проверка на эквивалентность ребер
@@ -163,30 +163,19 @@ namespace tsp
         /// <summary>
         /// Маршрут
         /// </summary>
-        public class Path : ICloneable
+        public class Path
         {
+            // набор ребер принаддежащих маршруту
             private LinkedList<Edge> edges = new LinkedList<Edge>();
 
             #region Конструторы
 
             /// <summary>
-            /// Создание пустого маршрута
+            /// Создание маршрута
             /// </summary>
             public Path()
             {
                 Cost = 0;
-            }
-
-            /// <summary>
-            /// Создание маршрута на основе другого
-            /// </summary>
-            /// <param name="other">другой маршрут</param>
-            public Path(Path other)
-            {
-                var clone = other.Clone() as Path;
-
-                edges = clone.edges;
-                Cost = clone.Cost;
             }
 
             #endregion
@@ -194,7 +183,7 @@ namespace tsp
             /// <summary>
             /// Суммарная стоимость маршрута
             /// </summary>
-            public double Cost { get; private set; }
+            public float Cost { get; private set; }
 
             /// <summary>
             /// Добавление ребра в маршрут
@@ -203,7 +192,7 @@ namespace tsp
             /// <returns>успешность добавления</returns>
             public bool Append(Edge e)
             {
-                if (edges.Contains(e)) 
+                if (edges.Contains(e))
                     return false;
 
                 Cost += e.Cost;
@@ -218,7 +207,7 @@ namespace tsp
             /// <returns>результат существования</returns>
             public bool IsExists()
             {
-                return edges.Count() != 0 && !double.IsPositiveInfinity(Cost);
+                return edges.Count() != 0 && !float.IsPositiveInfinity(Cost);
             }
 
             /// <summary>
@@ -232,19 +221,52 @@ namespace tsp
             }
 
             /// <summary>
-            /// Получение вершины-конца для вершины-начала в данном маршруте
+            /// Получение списка вершин в порядке их обхода
             /// </summary>
-            /// <param name="begin">вершина-начало</param>
-            /// <returns>-1: данная вершина не имеет инцидетного ребра, иначе вершина-конец</returns>
-            public int GetEndOfEdge(int begin)
+            /// <returns>список вершин в порядке обхода</returns>
+            public List<int> GetVertexInOrderTraversal()
             {
-                int end = -1;
-                foreach (var e in edges)
+                var vertexInOrder = new List<int>();
+
+                var vertex = new List<int>();
+                foreach(var e in edges) 
                 {
-                    if (begin == e.Begin)
-                        return e.End;
+                    if (!vertex.Contains(e.Begin))
+                        vertex.Add(e.Begin);
+                    if (!vertex.Contains(e.End))
+                        vertex.Add(e.End);
                 }
-                return end;
+                vertex.Sort();
+
+                if (vertex.Count == 0)
+                    return vertexInOrder;
+
+                int begin = vertex.First(), end = -1;
+
+                vertexInOrder.Add(begin);
+
+                for (int i = 0; i < vertex.Count; i++)
+                {
+                    foreach (var e in edges)
+                    {
+                        if (begin == e.Begin) 
+                        {
+                            end = e.End;
+                            break;
+                        }
+                    }
+
+                    if (end == -1)
+                        return vertexInOrder;
+
+                    vertexInOrder.Add(end);
+
+                    begin = end;
+
+                    end = -1;
+                }
+
+                return vertexInOrder;
             }
 
             /// <summary>
@@ -253,21 +275,8 @@ namespace tsp
             /// <returns>перечислитель</returns>
             public IEnumerator<Edge> GetEnumerator()
             {
-                foreach (var i in edges) 
+                foreach (var i in edges)
                     yield return i;
-            }
-
-            /// <summary>
-            /// Клонирование
-            /// </summary>
-            /// <returns>клон объекта</returns>
-            public object Clone() {
-                var clone = new Path();
-                
-                clone.Cost = Cost;
-                clone.edges = new LinkedList<Edge>(edges);
-
-                return clone as object;
             }
         }
 
@@ -276,7 +285,7 @@ namespace tsp
         /// <summary>
         /// Создание пустого орг. графа
         /// </summary>
-        public Digraph() 
+        public Digraph()
         {
             Adjacency = new AdjacencyMatrix(0);
         }
@@ -307,9 +316,10 @@ namespace tsp
 
             for (int i = 0; i < CountVertex(); ++i)
                 for (int j = 0; j < CountVertex(); ++j)
-                    if (!double.IsPositiveInfinity(Adjacency[i, j])) list.AddLast(new Edge(i, j, Adjacency[i, j]));
+                    if (!float.IsPositiveInfinity(Adjacency[i, j])) 
+                        list.AddLast(new Edge(i, j, Adjacency[i, j]));
 
-            foreach (var i in list) 
+            foreach (var i in list)
                 yield return i;
         }
 
@@ -319,7 +329,7 @@ namespace tsp
         /// <param name="begin">вершина-начало</param>
         /// <param name="end">вершина-конец</param>
         /// <returns></returns>
-        public double this[int begin, int end]
+        public float this[int begin, int end]
         {
             get { return Adjacency[begin, end]; }
             set { Adjacency[begin, end] = value; }
