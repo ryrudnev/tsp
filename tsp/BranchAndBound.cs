@@ -25,9 +25,7 @@ namespace tsp
             // правое ветвление метода
             RightBranching,
             // малый размер текущей матрицы метода
-            LittleMatrix,
-            // окончание метода
-            End
+            LittleMatrix
         }
 
         // следующее состояние метода
@@ -88,7 +86,7 @@ namespace tsp
             else if (Graph.CountVertex() == 1)
             {
                 // маршрут из одной вершины
-                TsPath.Append(new Digraph.Edge(0, 0, Graph[0, 0]));
+                TsPath.Append(new Digraph.Edge(0, 0, 0));
                 // окончание метода
                 next = IterationState.Stop;
             }
@@ -138,12 +136,12 @@ namespace tsp
                 // определение действий на текущей итерациии
                 switch (next)
                 {
-                        // остановка метода ветвей и границ
+                    // остановка метода ветвей и границ
                     case IterationState.Stop:
                         {
                             return false;
                         }
-                        // начало метода ветвей и границ
+                    // начало метода ветвей и границ
                     case IterationState.Start:
                         {
                             // иницилизация данных
@@ -163,7 +161,7 @@ namespace tsp
                             next = IterationState.LeftBranching;
                             return true;
                         }
-                        // левое ветвление метода ветвей и границ
+                    // левое ветвление метода ветвей и границ
                     case IterationState.LeftBranching:
                         {
                             // определение ребер с нулевой стоимостью
@@ -202,7 +200,7 @@ namespace tsp
                             next = IterationState.RightBranching;
                             return true;
                         }
-                        // правое ветвление метода
+                    // правое ветвление метода
                     case IterationState.RightBranching:
                         {
                             // исключение подмаршрутов для данного ребра
@@ -234,9 +232,11 @@ namespace tsp
                             // проверка на нахождения минимального ветвления и остановки
                             if (min.LowerBound <= parent.LowerBound)
                             {
-                                // окончание метода ветвей и границ
-                                next = IterationState.End;
-                                return true;
+                                // формирование маршрута коммивояжера
+                                TsPath = tree.CreatePathFromBranch(min);
+                                // остановка метода
+                                next = IterationState.Stop;
+                                return false;
                             }
 
                             // корректировка матрицы для данного ветвления и редуцирование
@@ -261,7 +261,7 @@ namespace tsp
                             next = IterationState.LeftBranching;
                             return true;
                         }
-                        // малый рамзер матрицы, включение ребер в маршрут
+                    // малый рамзер матрицы, включение ребер в маршрут
                     case IterationState.LittleMatrix:
                         {
                             // новый родитель
@@ -315,9 +315,11 @@ namespace tsp
                             // проверка на нахождения минимального ветвления и остановки
                             if (min.LowerBound <= parent.LowerBound)
                             {
-                                // окончание метода ветвей и границ
-                                next = IterationState.End;
-                                return true;
+                                // формирование маршрута коммивояжера
+                                TsPath = tree.CreatePathFromBranch(min);
+                                // остановка метода
+                                next = IterationState.Stop;
+                                return false;
                             }
 
                             // корректировка матрицы для данного ветвления и редуцирование
@@ -340,22 +342,6 @@ namespace tsp
 
                             // следующая итерация методав ветвей и границ - левое ветвление
                             next = IterationState.LeftBranching;
-                            return true;
-                        }
-                        // окончание метода
-                    case IterationState.End:
-                        {
-                            // формирование маршрута коммивояжера
-                            TsPath = tree.CreatePathFromBranch(min);
-
-                            // создание и добавление нового изображения ветвления
-                            Current = Painter.Drawing(Graph, TsPath);
-                            iterations.Add(Current);
-                            // перемещение текущего индекса на конец списка
-                            index = iterations.Count;
-
-                            // остановка метода
-                            next = IterationState.Stop;
                             return true;
                         }
                     default:
@@ -791,7 +777,7 @@ namespace tsp
             // если граф имеет одну вершину
             else if (graph.CountVertex() == 1)
             {
-                TsPath.Append(new Digraph.Edge(0, 0, graph[0, 0]));
+                TsPath.Append(new Digraph.Edge(0, 0, 0));
                 // маршрут для одной вершины
                 return TsPath;
             }
@@ -818,7 +804,7 @@ namespace tsp
             var parentBranch = new Branch(matrix.Reduce(), null);
             var tree = new TreeBranch(graph, parentBranch);
 
-            for (;;)
+            for (; ; )
             {
                 // ребра с нулевой стоимостью
                 var zeroEdges = new List<Digraph.Edge>();

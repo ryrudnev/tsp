@@ -121,7 +121,7 @@ namespace tsp
 
             var current = tree.Root;
 
-            string script = "graph G { nrankdir = LR node [style=\"filled\", fillcolor=\"cadetblue1\"] node" + no + "[label = " + "\"" + current.LowerBound + "\"] ", scriptMain = "";
+            string script = "graph G { nrankdir = LR node [style=\"filled\", fillcolor=\"gray\"] node" + no + "[label = " + "\"" + (float.IsPositiveInfinity(current.LowerBound) ? "Inf" : current.LowerBound.ToString()) + "\"] ", scriptMain = "";
 
             var dictionaryBranch = new Dictionary<BranchAndBound.Branch, uint>();
             dictionaryBranch.Add(current, no++);
@@ -135,7 +135,7 @@ namespace tsp
                     dictionaryBranch.Add(current.Left, no++);
                     queue.Enqueue(current.Left);
 
-                    scriptMain = "node" + dictionaryBranch[current.Left] + "[label = " + "\"" + current.Left.LowerBound + "\n" + (current.Left.BranchingEdge.Begin < 0 || current.Left.BranchingEdge.End < 0 ? "/(" : "(")
+                    scriptMain = "node" + dictionaryBranch[current.Left] + "[label = " + "\"" + (float.IsPositiveInfinity(current.Left.LowerBound) ? "Inf" : current.Left.LowerBound.ToString()) + "\n" + (current.Left.BranchingEdge.Begin < 0 || current.Left.BranchingEdge.End < 0 ? "/(" : "(")
                        + (Math.Abs(current.Left.BranchingEdge.Begin) + 1) + ", " + (Math.Abs(current.Left.BranchingEdge.End) + 1) + ")\"] " + scriptMain;
                 }
                 if (current.Right != null)
@@ -143,7 +143,7 @@ namespace tsp
                     dictionaryBranch.Add(current.Right, no++);
                     queue.Enqueue(current.Right);
 
-                    scriptMain = "node" + dictionaryBranch[current.Right] + "[label = " + "\"" + current.Right.LowerBound + "\n" + (current.Right.BranchingEdge.Begin < 0 || current.Right.BranchingEdge.End < 0 ? "/(" : "(")
+                    scriptMain = "node" + dictionaryBranch[current.Right] + "[label = " + "\"" + (float.IsPositiveInfinity(current.Right.LowerBound) ? "Inf" : current.Right.LowerBound.ToString()) + "\n" + (current.Right.BranchingEdge.Begin < 0 || current.Right.BranchingEdge.End < 0 ? "/(" : "(")
                         + (Math.Abs(current.Right.BranchingEdge.Begin) + 1) + ", " + (Math.Abs(current.Right.BranchingEdge.End) + 1) + ")\"] " + scriptMain;
                 }
 

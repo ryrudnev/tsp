@@ -217,6 +217,9 @@ namespace tsp
                 if (edges.Count() == 0 || float.IsPositiveInfinity(Cost))
                     return false;
 
+                if (edges.Count() == 1 && Graph.CountVertex() == 1)
+                    return true;
+
                 var vertices = new SortedDictionary<int, int>();
 
                 foreach (var e in edges)
