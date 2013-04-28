@@ -171,15 +171,22 @@ namespace tsp
             #region Конструторы
 
             /// <summary>
-            /// Создание маршрута
+            /// Создание маршрута принадлежащего указанному графу
             /// </summary>
-            public Path()
+            /// <param name="graph">орг. граф</param>
+            public Path(Digraph graph)
             {
+                Graph = graph;
                 Cost = 0;
             }
 
             #endregion
 
+            /// <summary>
+            /// Граф, которому принадлежит маршрут
+            /// </summary>
+            public Digraph Graph { get; private set; }
+            
             /// <summary>
             /// Суммарная стоимость маршрута
             /// </summary>
@@ -202,12 +209,37 @@ namespace tsp
             }
 
             /// <summary>
-            /// Проверка маршрута на существование
+            /// Проверка маршрута на существование для данного графа
             /// </summary>
             /// <returns>результат существования</returns>
             public bool IsExists()
             {
-                return edges.Count() != 0 && !float.IsPositiveInfinity(Cost);
+                if (edges.Count() == 0 || float.IsPositiveInfinity(Cost))
+                    return false;
+
+                var vertices = new SortedDictionary<int, int>();
+
+                foreach (var e in edges)
+                {
+                    if (!vertices.ContainsKey(e.Begin))
+                        vertices.Add(e.Begin, 0);
+                    else
+                        vertices[e.Begin]++;
+
+                    if (!vertices.ContainsKey(e.End))
+                        vertices.Add(e.End, 0);
+                    else
+                        vertices[e.End]++;
+                }
+
+                if (vertices.Count != Graph.CountVertex())
+                    return false;
+
+                foreach (var v in vertices)
+                    if (v.Value != 1)
+                        return false;
+
+                return true;
             }
 
             /// <summary>
@@ -226,44 +258,29 @@ namespace tsp
             /// <returns>список вершин в порядке обхода</returns>
             public List<int> GetVertexInOrderTraversal()
             {
+                if (!IsExists())
+                    return new List<int>();
+
+                int begin = 0, end = -1;
+
                 var vertexInOrder = new List<int>();
-
-                var vertex = new List<int>();
-                foreach(var e in edges) 
-                {
-                    if (!vertex.Contains(e.Begin))
-                        vertex.Add(e.Begin);
-                    if (!vertex.Contains(e.End))
-                        vertex.Add(e.End);
-                }
-                vertex.Sort();
-
-                if (vertex.Count == 0)
-                    return vertexInOrder;
-
-                int begin = vertex.First(), end = -1;
-
                 vertexInOrder.Add(begin);
 
-                for (int i = 0; i < vertex.Count; i++)
+                for (int i = 0; i < Graph.CountVertex(); i++)
                 {
                     foreach (var e in edges)
-                    {
                         if (begin == e.Begin) 
                         {
                             end = e.End;
                             break;
                         }
-                    }
 
                     if (end == -1)
-                        return vertexInOrder;
+                        return new List<int>();
 
                     vertexInOrder.Add(end);
 
-                    begin = end;
-
-                    end = -1;
+                    begin = end; end = -1;
                 }
 
                 return vertexInOrder;

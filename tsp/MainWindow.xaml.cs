@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Windows;
@@ -15,26 +14,14 @@ namespace tsp
     /// </summary>
     public partial class MainWindow : Window
     {
-        /// <summary>
-        /// Текущий орг. граф 
-        /// </summary>
+        // Текущий орг. граф 
         private static Digraph graph = new Digraph();
 
-        /// <summary>
-        /// Текуший мин. маршрут коммивояжера
-        /// </summary>
-        private static Digraph.Path pathTsp = new Digraph.Path();
+        // Текуший маршрут коммивояжера
+        private static Digraph.Path pathTs = new Digraph.Path(graph);
 
-        /// <summary>
-        /// Алгоритм метода ветвей и границ
-        /// </summary>
-
-        private static BranchAndBound fast = new BranchAndBound(graph);
-
-        /// <summary>
-        /// Перечислитель итераций метод ветвей и границ
-        /// </summary>
-        private IEnumerator iterator;
+        // Трассировочный метод ветвей и границ
+        private static BranchAndBound iterator = new BranchAndBound(graph);
 
         #region Управление скроллом просмотра изображения
 
@@ -153,6 +140,71 @@ namespace tsp
 
         #endregion
 
+        #region Фоновое исполнение
+
+        // окно ожидания выполнения метода ветвей и границ
+        WaitingWindow wait;
+
+        // фоновый исполнитель
+        private BackgroundWorker tspBackgroundWoker;
+
+        // выполнение метода ветвей и границ
+        private void TspDoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
+        {
+            BackgroundWorker tspWorker = sender as BackgroundWorker;
+            tspWorker.ReportProgress(0);
+
+            pathTs = BranchAndBound.Tsp(graph);
+        }
+
+        // отображенеи измения прогресса выполнения метода ветвей и границ
+        private void TspProgressChanged(object sender, System.ComponentModel.ProgressChangedEventArgs e)
+        {
+            wait = new WaitingWindow();
+            wait.ShowDialog();
+        }
+
+        // окончание выполнение метода ветвей и границ
+        private void TspRunWorkerCompleted(object sender, System.ComponentModel.RunWorkerCompletedEventArgs e)
+        {
+            wait.Close();
+
+            var vertexInTsPath = pathTs.GetVertexInOrderTraversal();
+            if (vertexInTsPath.Count == 0)
+            {
+                MessageBox.Show("Маршрут коммивояжера не найден.", "Поиск маршрута завершен!", MessageBoxButton.OK, MessageBoxImage.Information);
+                tspPathTxtBox.Text = "Маршрута коммивояжера для данного графа не существует.";
+                return;
+            }
+
+            // отрисовка графа с выделенным путем
+            try
+            {
+                tspImg.Source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(Painter.Drawing(graph, pathTs).GetHbitmap(),
+                    IntPtr.Zero, System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Ошибка!", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            // составление маршрута коммивояжера
+            tspPathTxtBox.Text = "Стоимость маршрута: " + pathTs.Cost + "\n";
+            tspPathTxtBox.Text += "\nМаршрут: ";
+
+            for (int i = 0; i < vertexInTsPath.Count; i++)
+            {
+                tspPathTxtBox.Text += vertexInTsPath[i] + 1;
+                if (i != vertexInTsPath.Count - 1)
+                    tspPathTxtBox.Text += " -> ";
+            }
+
+            MessageBox.Show("Маршрут коммивояжера найден.", "Поиск маршрута завершен!", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        #endregion 
+
         public MainWindow()
         {
             InitializeComponent();
@@ -169,6 +221,7 @@ namespace tsp
 
             slider.ValueChanged += OnSliderValueChanged;
         }
+        
 
         // открытие файла с матрицей смежности 
         private void FileOpen(object sender, RoutedEventArgs e)
@@ -237,7 +290,8 @@ namespace tsp
             // изменение матрицы графа
             graph.Adjacency = matrix;
 
-            fast = new BranchAndBound(graph);
+            // новый метод ветвей и границ для трассировки
+            iterator = new BranchAndBound(graph);
 
             // установка изображения графа
             try
@@ -250,7 +304,7 @@ namespace tsp
                 MessageBox.Show(exc.Message, "Ошибка!", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
-
+            // обнуление информации о маршруте
             tspPathTxtBox.Text = "";
         }
 
@@ -276,63 +330,6 @@ namespace tsp
             window.ShowDialog();
         }
 
-        #region Фоновое исполнение
-
-        WaitingWindow wait;
-
-        private BackgroundWorker tspBackgroundWoker;
-
-        private void TspDoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
-        {
-            BackgroundWorker tspWorker = sender as BackgroundWorker;
-            tspWorker.ReportProgress(0);
-
-            pathTsp = BranchAndBound.Tsp(graph);
-        }
-
-        private void TspProgressChanged(object sender, System.ComponentModel.ProgressChangedEventArgs e)
-        {
-            wait = new WaitingWindow();
-            wait.ShowDialog();
-        }
-
-        private void TspRunWorkerCompleted(object sender, System.ComponentModel.RunWorkerCompletedEventArgs e)
-        {
-            wait.Close();
-
-            if (pathTsp.IsExists() == false)
-            {
-                tspPathTxtBox.Text = "Маршрута коммивояжера для данного графа не существует.";
-                return;
-            }
-
-            // отрисовка графа с выделенным путем
-            try
-            {
-                tspImg.Source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(Painter.Drawing(graph, pathTsp).GetHbitmap(),
-                    IntPtr.Zero, System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message, "Ошибка!", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            // составление маршрута коммивояжера
-            tspPathTxtBox.Text = "Стоимость маршрута: " + pathTsp.Cost + "\n";
-            tspPathTxtBox.Text += "\nМаршрут: ";
-
-            var vertex = pathTsp.GetVertexInOrderTraversal();
-            for (int i = 0; i < vertex.Count; i++)
-            {
-                tspPathTxtBox.Text += vertex[i] + 1;
-                if (i != vertex.Count - 1)
-                    tspPathTxtBox.Text += " -> ";
-            }
-        }
-
-        #endregion
-
         // запуск метода ветвей и границ
         private void RunTsp(object sender, RoutedEventArgs e)
         {
@@ -342,90 +339,37 @@ namespace tsp
                 return;
             }
 
-            // установка на начало итераций
-            iterator = fast.GetEnumerator();
+            // обнуление режима трассировки метода ветвей и границ
+            traceTspBttn.Content = "Трассировать ветвление метода";
+            stepBackTspBttn.IsEnabled = false;
+            stepForwardTspBttn.IsEnabled = false;
 
             // фоновое выполнение метода ветвей и границ 
             tspBackgroundWoker.RunWorkerAsync();
         }
 
+        #region Трассировочный метод ветвей и границ
+
         // запуск трассировочного метода ветвей и границ
         private void TraceTsp(object sender, RoutedEventArgs e)
         {
-            if (graph.CountVertex() == 0)
+            if (traceTspBttn.Content as string == "Трассировать ветвление метода")
             {
-                MessageBox.Show("Невозможно найти маршрут коммиворяжера.\nГраф не задан.", "Предупреждение!", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                traceTspBttn.Content = "Выйти из трассировки";
+                stepBackTspBttn.IsEnabled = true;
+                stepForwardTspBttn.IsEnabled = true;
+                iterator.Reset();
             }
-
-            if (fast.MoveNext())
+            else
             {
+                traceTspBttn.Content = "Трассировать ветвление метода";
+                stepBackTspBttn.IsEnabled = false;
+                stepForwardTspBttn.IsEnabled = false;
+
+                // задание изображения по умолчанию
                 try
                 {
-                    tspImg.Source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(fast.Current[0].GetHbitmap(),
-                        IntPtr.Zero, System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
-                }
-                catch (Exception exc)
-                {
-                    MessageBox.Show(exc.Message, "Ошибка!", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-            }
-            /*
-        else
-        {
-            // установка на начало итераций
-            iterator = algorithm.GetEnumerator();
-
-            // получение пути
-            pathTsp = algorithm.MinPath;
-
-            if (pathTsp.IsExists() == false)
-            {
-                tspPathTxtBox.Text = "Маршрута коммивояжера для данного графа не существует.";
-                return;
-            }
-
-            // отрисовка графа с выделенным путем
-            try
-            {
-                tspImg.Source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(Painter.Drawing(graph, pathTsp).GetHbitmap(),
-                    IntPtr.Zero, System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
-            }
-            catch (Exception exc)
-            {
-                MessageBox.Show(exc.Message, "Ошибка!", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            // составление маршрута
-            tspPathTxtBox.Text = "Стоимость маршрута: " + pathTsp.Cost + "\n";
-            tspPathTxtBox.Text += "\nМаршрут: ";
-
-            int point = 0;
-            tspPathTxtBox.Text += (point + 1);
-            for (int i = 0; i < graph.CountVertex(); i++)
-            {
-                point = pathTsp.GetEndOfEdge(point);
-                tspPathTxtBox.Text += " -> " + (point + 1);
-            }
-        }
-             */
-        }
-
-        private void TraceBackTsp(object sender, RoutedEventArgs e)
-        {
-            if (graph.CountVertex() == 0)
-            {
-                MessageBox.Show("Невозможно найти маршрут коммиворяжера.\nГраф не задан.", "Предупреждение!", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            if (fast.MovePrevious())
-            {
-                try
-                {
-                    tspImg.Source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(fast.Current[0].GetHbitmap(),
+                    tspImg.Source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(Painter.Drawing(graph).GetHbitmap(),
                         IntPtr.Zero, System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
                 }
                 catch (Exception exc)
@@ -436,5 +380,54 @@ namespace tsp
             }
         }
 
+        // предыдущий шаг метода ветвей и границ
+        private void StepBackTsp(object sender, RoutedEventArgs e)
+        {
+            if (iterator.MovePrevious())
+            {
+                try
+                {
+                    tspImg.Source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(iterator.Current.GetHbitmap(),
+                        IntPtr.Zero, System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+                }
+                catch (Exception exc)
+                {
+                    MessageBox.Show(exc.Message, "Ошибка!", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                // возможность перейти на следующий шаг метода ветвей и границ
+                stepForwardTspBttn.IsEnabled = true;
+            }
+            else
+                // невозможность перейи на предыдущий шаг метода ветвей и границ
+                stepBackTspBttn.IsEnabled = false;
+        }
+
+        // следущий шаг метода ветвей и границ
+        private void StepForwardTsp(object sender, RoutedEventArgs e)
+        {
+            if (iterator.MoveNext())
+            {
+                try
+                {
+                    tspImg.Source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(iterator.Current.GetHbitmap(),
+                        IntPtr.Zero, System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+                }
+                catch (Exception exc)
+                {
+                    MessageBox.Show(exc.Message, "Ошибка!", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                // возможность перейти на предыдущий шаг метода ветвей и границ
+                stepBackTspBttn.IsEnabled = true;
+            }
+            else
+                // невозможность перейи на следущий шаг метода ветвей и границ
+                stepForwardTspBttn.IsEnabled = false;
+        }
+
+        #endregion
     }
 }

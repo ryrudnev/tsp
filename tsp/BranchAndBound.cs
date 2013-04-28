@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Drawing;
+using System.Linq;
 
 namespace tsp
 {
@@ -37,9 +37,11 @@ namespace tsp
         // и графа с выделенным маршрутом
         private int index = 0;
 
-        // список изображений ветвления метода и графа с выделенным маршрутом
-        // на всех итерациях метода
-        List<Bitmap[]> iterations = new List<Bitmap[]>();
+        // список изображений ветвления метода
+        private List<Bitmap> iterations = new List<Bitmap>();
+
+        // количество добавляемых ребер из матрицы размером два
+        private ushort countAdeddEdgeFromMatrix = 0;
 
         // текущее непересекающиеся множество
         private Dsu dsu;
@@ -68,13 +70,14 @@ namespace tsp
         /// <param name="graph">орг. граф</param>
         public BranchAndBound(Digraph graph)
         {
+            // метод ветвей и границ для указанного графа
             Graph = graph;
 
             // переход в следующее состояние
             next = IterationState.Start;
 
             // создание пустого маршрута коммивояжера
-            TsPath = new Digraph.Path();
+            TsPath = new Digraph.Path(Graph);
 
             if (Graph.CountVertex() == 0)
             {
@@ -115,9 +118,9 @@ namespace tsp
         }
 
         /// <summary>
-        /// Битовые изображения, ветвления метода и графа с выделенным маршрутом
+        /// Битовое изображение ветвления метода
         /// </summary>
-        public Bitmap[] Current { private set; get; }
+        public Bitmap Current { private set; get; }
 
         public bool MoveNext()
         {
@@ -148,10 +151,10 @@ namespace tsp
                             min = new Branch(float.PositiveInfinity, null);
                             matrix = new ReductionMatrix(Graph.Adjacency);
                             parent = new Branch(matrix.Reduce(), null);
-                            tree = new TreeBranch(parent);
+                            tree = new TreeBranch(Graph, parent);
 
-                            // создание и добавление нового изображения ветвления и маршрута на графе для данной итерации
-                            Current = new Bitmap[] { Painter.Drawing(tree), Painter.Drawing(Graph, tree.CreatePathFromBranch(parent))};
+                            // создание и добавление нового изображения ветвления
+                            Current = Painter.Drawing(tree);
                             iterations.Add(Current);
                             // перемещение текущего индекса на конец списка
                             index = iterations.Count;
@@ -173,7 +176,7 @@ namespace tsp
                             // если нет ребер ветвления - нет маршрута коммивояжера
                             if (zeroEdges.Count == 0)
                             {
-                                TsPath = new Digraph.Path();
+                                TsPath = new Digraph.Path(Graph);
 
                                 // остановка метода ветвей и границ
                                 next = IterationState.Stop;
@@ -189,8 +192,8 @@ namespace tsp
                             // добавление в дерево ветвлений
                             tree.Add(parent, Branch.Direction.Left, left);
 
-                            // создание и добавление нового изображения ветвления и маршрута на графе для данной итерации
-                            Current = new Bitmap[] { Painter.Drawing(tree), Painter.Drawing(Graph, tree.CreatePathFromBranch(left)) };
+                            // создание и добавление нового изображения ветвления
+                            Current = Painter.Drawing(tree);
                             iterations.Add(Current);
                             // перемещение текущего индекса на конец списка
                             index = iterations.Count;
@@ -211,8 +214,8 @@ namespace tsp
                             // добавление в дерево ветвлений
                             tree.Add(parent, Branch.Direction.Right, right);
 
-                            // создание и добавление нового изображения ветвления и маршрута на графе для данной итерации
-                            Current = new Bitmap[] { Painter.Drawing(tree), Painter.Drawing(Graph, tree.CreatePathFromBranch(right)) };
+                            // создание и добавление нового изображения ветвления
+                            Current = Painter.Drawing(tree);
                             iterations.Add(Current);
                             // перемещение текущего индекса на конец списка
                             index = iterations.Count;
@@ -229,7 +232,7 @@ namespace tsp
                             parent = tree.GetNotGoBranches().OrderBy(b => b.LowerBound).ToList().First();
 
                             // проверка на нахождения минимального ветвления и остановки
-                            if (min.LowerBound < parent.LowerBound)
+                            if (min.LowerBound <= parent.LowerBound)
                             {
                                 // окончание метода ветвей и границ
                                 next = IterationState.End;
@@ -261,50 +264,47 @@ namespace tsp
                         // малый рамзер матрицы, включение ребер в маршрут
                     case IterationState.LittleMatrix:
                         {
-                            // продолжение вычисления матрицы
-                            bool isContinue = false;
-                            
                             // новый родитель
                             parent = right;
-                            for (int i = 0; i < matrix.Size; i++)
-                                for (int j = 0; j < matrix.Size; j++)
+                            for (int i = 0; i < matrix.Size && countAdeddEdgeFromMatrix != 1; i++)
+                                for (int j = 0; j < matrix.Size && countAdeddEdgeFromMatrix != 1; j++)
                                 {
                                     if (matrix[i, j] == 0)
                                     {
                                         // исключение данного ребра из матрицы
                                         matrix[i, j] = float.PositiveInfinity;
-                                        
                                         // создание и добавление правого ветвления к родителю
                                         right = new Branch(parent.LowerBound, new Digraph.Edge(i, j, Graph[i, j]));
                                         tree.Add(parent, Branch.Direction.Right, right);
-                                        
-                                        // продолжать включать ребра в маршрут
-                                        isContinue = true;
+                                        // новый родитель
+                                        parent = right;
+                                        // продолжать включать ребра в маршрут на следующей итерации
+                                        countAdeddEdgeFromMatrix++;
                                     }
-
-                                    // остановка на данной итерации
-                                    if (isContinue) 
-                                        break;
                                 }
 
                             // если следующая итерация та же
-                            if (isContinue)
+                            if (countAdeddEdgeFromMatrix == 1)
                             {
-                                // создание и добавление нового изображения ветвления и маршрута на графе для данной итерации
-                                Current = new Bitmap[] { Painter.Drawing(tree), Painter.Drawing(Graph, tree.CreatePathFromBranch(right)) };
+                                // создание и добавление нового изображения ветвления
+                                Current = Painter.Drawing(tree);
                                 iterations.Add(Current);
                                 // перемещение текущего индекса на конец списка
                                 index = iterations.Count;
-
+                                // на следующей итерации будет включено второе ребро
+                                countAdeddEdgeFromMatrix++;
                                 return true;
                             }
+                            else
+                                // все ребра включены для данной матрицы
+                                countAdeddEdgeFromMatrix = 0;
 
                             // иначе проверка на новое минимальное ветвление
                             if (parent.LowerBound < min.LowerBound)
                                 min = parent;
 
-                            // создание и добавление нового изображения ветвления и маршрута на графе для данной итерации
-                            Current = new Bitmap[] { Painter.Drawing(tree), Painter.Drawing(Graph, tree.CreatePathFromBranch(parent)) };
+                            // создание и добавление нового изображения ветвления
+                            Current = Painter.Drawing(tree);
                             iterations.Add(Current);
                             // перемещение текущего индекса на конец списка
                             index = iterations.Count;
@@ -313,7 +313,7 @@ namespace tsp
                             parent = tree.GetNotGoBranches().OrderBy(b => b.LowerBound).ToList().First();
 
                             // проверка на нахождения минимального ветвления и остановки
-                            if (min.LowerBound < parent.LowerBound)
+                            if (min.LowerBound <= parent.LowerBound)
                             {
                                 // окончание метода ветвей и границ
                                 next = IterationState.End;
@@ -345,18 +345,18 @@ namespace tsp
                         // окончание метода
                     case IterationState.End:
                         {
-                            // создание и добавление нового изображения ветвления и маршрута на графе для данной итерации
-                            Current = new Bitmap[] { Painter.Drawing(tree), Painter.Drawing(Graph, tree.CreatePathFromBranch(min)) };
+                            // формирование маршрута коммивояжера
+                            TsPath = tree.CreatePathFromBranch(min);
+
+                            // создание и добавление нового изображения ветвления
+                            Current = Painter.Drawing(Graph, TsPath);
                             iterations.Add(Current);
                             // перемещение текущего индекса на конец списка
                             index = iterations.Count;
 
-                            // формирование маршрута коммивояжера
-                            TsPath = tree.CreatePathFromBranch(min);
-
                             // остановка метода
                             next = IterationState.Stop;
-                            return false;
+                            return true;
                         }
                     default:
                         return false;
@@ -643,19 +643,21 @@ namespace tsp
             /// </summary>
             public Branch Root { set; get; }
 
-            #region Конструкторы
-
             /// <summary>
-            /// Создание пустого дерева ветвления
+            /// Граф для которого строится дерево ветвлений
             /// </summary>
-            public TreeBranch() { }
+            public Digraph Graph { get; private set; }
+
+            #region Конструкторы
 
             /// <summary>
             /// Создание дерева ветвления
             /// </summary>
+            /// <param name="graph">орг. граф для которого строится дерево ветвлений</param>
             /// <param name="root">корень дерева</param>
-            public TreeBranch(Branch root)
+            public TreeBranch(Digraph graph, Branch root)
             {
+                Graph = graph;
                 Root = root;
             }
 
@@ -731,7 +733,7 @@ namespace tsp
             {
                 var edges = GetEdgesBranching(branch);
 
-                var path = new Digraph.Path();
+                var path = new Digraph.Path(Graph);
 
                 foreach (var e in edges)
                     if (e.Begin >= 0 && e.End >= 0)
@@ -778,7 +780,7 @@ namespace tsp
         public static Digraph.Path Tsp(Digraph graph)
         {
             // маршрут коммивояжера
-            var TsPath = new Digraph.Path();
+            var TsPath = new Digraph.Path(graph);
 
             // если граф пуст
             if (graph.CountVertex() == 0)
@@ -814,7 +816,7 @@ namespace tsp
 
             /// Создание корня и дерева ветвления
             var parentBranch = new Branch(matrix.Reduce(), null);
-            var tree = new TreeBranch(parentBranch);
+            var tree = new TreeBranch(graph, parentBranch);
 
             for (;;)
             {
@@ -828,7 +830,7 @@ namespace tsp
 
                 // если нет ребер ветвления - нет маршрута коммивояжера
                 if (zeroEdges.Count == 0)
-                    return new Digraph.Path();
+                    return new Digraph.Path(graph);
 
                 /// Определение ребра ветвления - ребра с максимальным штрафом
                 var branchingEdge = zeroEdges.OrderByDescending(e => e.Cost).ToList().First();

@@ -56,7 +56,7 @@ namespace tsp
             if (graph == null || graph.CountVertex() == 0)
                 throw new Exception("Невозможно отрисовать граф. Граф не задан.");
 
-            string script = "digraph G { nrankdir = LR ";
+            string script = "digraph G { nrankdir=LR  node [style=\"filled\", fillcolor=\"skyblue\"]";
 
             for (int i = 0; i < graph.CountVertex(); i++)
                 script += (i + 1) + " ";
@@ -85,7 +85,7 @@ namespace tsp
             if (path == null || !path.IsExists())
                 return Drawing(graph);
 
-            string script = "digraph G { nrankdir = LR  node [style=\"filled\", fillcolor=\"red\"]";
+            string script = "digraph G { nrankdir=LR  node [style=\"filled\", fillcolor=\"skyblue\"]";
 
             for (int i = 0; i < graph.CountVertex(); i++)
                 script += (i + 1) + " ";
@@ -96,8 +96,8 @@ namespace tsp
                     {
                         script += (i + 1) + " -> " + (j + 1) + " [label=\"" + graph[i, j] + "\"";
 
-                        if (path.IsContain(new Digraph.Edge(i, j, graph[i, j]))) 
-                            script += ", color=\"red\"";
+                        if (path.IsContain(new Digraph.Edge(i, j, graph[i, j])))
+                            script += ", fontcolor=\"firebrick\", color=\"firebrick2\", penwidth=3, weight=1";
 
                         script += "] ";
                     }
@@ -121,7 +121,7 @@ namespace tsp
 
             var current = tree.Root;
 
-            string script = "graph G { nrankdir = LR node" + no + "[label = " + "\"" + current.LowerBound + "\"] ", scriptMain = "";
+            string script = "graph G { nrankdir = LR node [style=\"filled\", fillcolor=\"cadetblue1\"] node" + no + "[label = " + "\"" + current.LowerBound + "\"] ", scriptMain = "";
 
             var dictionaryBranch = new Dictionary<BranchAndBound.Branch, uint>();
             dictionaryBranch.Add(current, no++);
